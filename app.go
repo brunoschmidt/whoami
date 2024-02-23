@@ -37,12 +37,15 @@ var upgrader = websocket.Upgrader{
 }
 
 var (
-	cert    string
-	key     string
-	ca      string
-	port    string
-	name    string
-	verbose bool
+	cert    		    string
+	key     		    string
+	ca      		    string
+	port    		    string
+	name    		    string
+	connectivityUri     string
+	connectivityMethod  string
+	connectivityBody    string
+	verbose             bool
 )
 
 func init() {
@@ -52,6 +55,9 @@ func init() {
 	flag.StringVar(&ca, "cacert", "", "give me a CA chain, enforces mutual TLS")
 	flag.StringVar(&port, "port", getEnv("WHOAMI_PORT_NUMBER", "80"), "give me a port number")
 	flag.StringVar(&name, "name", os.Getenv("WHOAMI_NAME"), "give me a name")
+	flag.StringVar(&connectivityUri, "connectivity", os.Getenv("WHOAMI_CONNECTIVITY_URI"), "give me the URL to check connectivity")
+	flag.StringVar(&connectivityMethod, "connectivity_method", os.Getenv("WHOAMI_CONNECTIVITY_METHOD"), "give me the http method used to check connectivity")
+	flag.StringVar(&connectivityBody, "connectivity_body", os.Getenv("WHOAMI_CONNECTIVITY_BODY"), "give me the request body to check connectivity")
 }
 
 // Data whoami information.
@@ -75,6 +81,7 @@ func main() {
 	mux.Handle("/echo", handle(echoHandler, verbose))
 	mux.Handle("/bench", handle(benchHandler, verbose))
 	mux.Handle("/api", handle(apiHandler, verbose))
+	mux.Handle("/connectivity", handle(connectivityHandler, verbose))
 	mux.Handle("/health", handle(healthHandler, verbose))
 	mux.Handle("/", handle(whoamiHandler, verbose))
 
@@ -335,4 +342,22 @@ func getIPs() []string {
 	}
 
 	return ips
+}
+
+func connectivityHandler(w http.ResponseWriter, r *http.Request) {
+    resp, err := http.Get(connectivityUri)
+    if err != nil {
+        http.Error(w, err.Error(), http.StatusInternalServerError)
+        return
+    }
+    defer resp.Body.Close()
+
+    body, err := io.ReadAll(resp.Body)
+    if err != nil {
+        http.Error(w, err.Error(), http.StatusInternalServerError)
+        return
+    }
+
+    w.Header().Set("Content-Type", "application/json")
+    w.Write(body)
 }
